@@ -1,0 +1,244 @@
+<script>
+  // Set the URL to be scraped
+  const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
+  const targetUrl = 'https://trends24.in/greece/';
+
+  // Fetch the HTML content of the website using a proxy to bypass the CORS restrictions
+  fetch(proxyUrl + targetUrl)
+    .then(response => {
+      if (!response.ok) {
+        const link = document.createElement('a');
+        link.href = proxyUrl;
+        link.target = '_blank';
+        link.textContent = 'You must get temporary CORS access first';
+        document.body.appendChild(link);
+        
+        return false;
+      }
+      return response.text();
+    })
+    .then(html => {
+      const parser = new DOMParser();
+      const doc = parser.parseFromString(html, 'text/html');
+      processTrendCards(doc);
+    })
+    .catch(() => {
+      const span = document.createElement('span');
+      span.textContent = 'Error: ' + error.message;
+      document.body.appendChild(span);
+    });
+    
+   // Load string-similarity library dynamically
+   function loadScript(url) {
+    return new Promise((resolve, reject) => {
+      if (!document.querySelector(`script[src="${url}"]`)) {
+        const script = document.createElement('script');
+        script.type = 'text/javascript';
+        script.src = url;
+        script.onload = resolve;
+        script.onerror = reject;
+        document.head.appendChild(script);
+      }
+    });
+   }
+   
+   async function mergeSimilarKeys(data) {
+    // Load string-similarity library
+    await loadScript('https://unpkg.com/string-similarity@4.0.4/umd/string-similarity.min.js');
+    
+    const SIMILARITY_THRESHOLD = 0.6;
+
+    // Find all pairs of keys with similarity score over 0.6
+    const pairs = [];
+    const keys = Object.keys(data);
+    for (let i = 0; i < keys.length; i++) {
+      for (let j = i + 1; j < keys.length; j++) {
+        const similarity = stringSimilarity.compareTwoStrings(keys[i].toLowerCase(), keys[j].toLowerCase());
+        if (similarity > SIMILARITY_THRESHOLD) {
+          let found = false;
+          for (let k = 0; k < pairs.length; k++) {
+            if (pairs[k].includes(keys[i]) || pairs[k].includes(keys[j])) {
+              pairs[k].push(keys[i], keys[j]);
+              found = true;
+              break;
+            }
+          }
+          if (!found) {
+            pairs.push([keys[i], keys[j]]);
+          }
+        }
+      }
+    }
+
+    // Merge keys in each pair
+    pairs.forEach(pair => {
+      let highestPointsKey = pair[0];
+      let highestPoints = data[highestPointsKey].points;
+      for (let i = 1; i < pair.length; i++) {
+        const key = pair[i];
+        if (data[key].points > highestPoints) {
+          highestPointsKey = key;
+          highestPoints = data[key].points;
+        }
+      }
+      const mergedKey = highestPointsKey;
+      const mergedPoints = pair.reduce((acc, key) => acc + data[key].points, 0);
+      const mergedRanks = [];
+      for (let i = 0; i < data[highestPointsKey].ranks.length; i++) {
+        let lowestRank = data[highestPointsKey].ranks[i];
+        for (let j = 0; j < pair.length; j++) {
+          const key = pair[j];
+          const rank = data[key].ranks[i];
+          if (rank !== undefined && (lowestRank === undefined || rank < lowestRank)) {
+            lowestRank = rank;
+          }
+        }
+        mergedRanks.push(lowestRank);
+      }
+      data[mergedKey] = { points: mergedPoints, ranks: mergedRanks };
+      pair.forEach(key => {
+        if (key !== mergedKey) {
+          delete data[key];
+        }
+      });
+    });
+
+    return data;
+   }
+
+   async function processTrendCards(doc) {
+     
+    // Create an object to hold trends data
+    const globalTrends = {};
+    
+    // Maximum number of trends to show
+    const maxTrends = 10;
+    
+    // Get all trend card lists
+    const trendCards = doc.querySelectorAll('.trend-card__list');
+
+    for (let i = 0; i < trendCards.length; i++) {
+      const trendCard = trendCards[i];
+      
+      // Calculate the point system for this trend card list
+      const pointSystem = [89, 55, 34, 21, 13, 8, 5, 3, 2, 1].map(
+        point => Math.ceil(point - (i * (point / trendCards.length)))
+      );
+      
+      const listItems = trendCard.querySelectorAll('li');
+
+      for (let j = 0; j < Math.min(listItems.length, 10); j++) {
+        const tag = listItems[j].querySelector('a').textContent;
+        const currentTrendPoints = pointSystem[j];
+        const currentTrendRank = j;
+
+        if (!globalTrends[tag]) {
+          globalTrends[tag] = {
+            points: currentTrendPoints,
+            ranks: [],
+          };
+        } else {
+          globalTrends[tag].points += currentTrendPoints;
+        }
+
+        // If the current trend card list is one of the first two (last 2 hours), add the current title's rank to its ranks array
+        if (i < 2) {
+          globalTrends[tag].ranks[i] = currentTrendRank;
+        }
+      }
+    }
+    
+    const mergedTrends = await mergeSimilarKeys(globalTrends);
+
+    // Sort the mergedTrends object by points and take the top maxTrends tags
+    const sortedTrends = Object.entries(mergedTrends)
+      .sort(([, dataA], [, dataB]) => dataB.points - dataA.points)
+      .slice(0, maxTrends);
+
+    // Prepare the report
+    const header = document.createElement('h1');
+    const link = document.createElement('a');
+    link.href = targetUrl;
+    link.target = '_blank';
+    link.textContent = 'Twitter Trends Greece';
+    header.appendChild(link);
+    document.body.appendChild(header);
+    
+    const table = document.createElement('table');
+    table.setAttribute('border', '1');
+    table.setAttribute('cellpadding', '10');
+    table.setAttribute('cellspacing', '0');
+    table.setAttribute('width', '100%');
+    document.body.appendChild(table);
+
+    const tbody = document.createElement('tbody');
+    table.appendChild(tbody);
+
+    // Loop through each sorted tag and add a row to the table
+    sortedTrends.forEach(([tag, data], i) => {
+      
+      // Filter out undefined and null values from the ranks array
+      const filteredArr = data.ranks.filter(elm => elm !== undefined && elm !== null);
+      const firstRank = data.ranks[0];
+
+      const row = document.createElement('tr');
+      tbody.appendChild(row);
+
+      const rankCell = document.createElement('td');
+      rankCell.textContent = i + 1;
+      row.appendChild(rankCell);
+
+      let trendCell = document.createElement('td');
+      let trendText = '';
+      let trendColor = '#000000';
+      let currentRank = ` (${firstRank + 1})`;
+
+      // Determine the trend and set the appropriate trend text and color
+      if (filteredArr.length === 1 && firstRank) {
+        // Trend only appears in the first trend card (last hour)
+        trendText = '🔥';
+      } else if (filteredArr.length === 2) {
+        const secondRank = data.ranks[1];
+
+        if (firstRank === secondRank) {
+          // Trend appears in both trend cards at the same rank
+          trendText = '⬤';
+        } else {
+          const rankDiff = Math.abs(firstRank - secondRank);
+
+          if (firstRank < secondRank) {
+            // Trend has higher rank in the first trend card
+            trendText = `▲ ${rankDiff}`;
+            trendColor = "#448118";
+          } else {
+            // Trend has higher rank in the second trend card
+            trendText = `▼ ${rankDiff}`;
+            trendColor = '#b91b20';
+          }
+        }
+      } else {
+        // Trend doesn't appear in either of the trend cards
+        trendText = `━`;
+        currentRank = '';
+      }
+      
+      trendCell.textContent = trendText + currentRank;
+      trendCell.setAttribute('style','color:' + trendColor);
+      row.appendChild(trendCell);
+      
+      const titleCell = document.createElement('td');
+      const tagLink = document.createElement('a');
+      tagLink.href = 'https://twitter.com/search?q=' + tag;
+      tagLink.target = '_blank';
+      tagLink.textContent = tag;
+      titleCell.appendChild(tagLink);
+      row.appendChild(titleCell);
+      
+      const pointsCell = document.createElement('td');
+      pointsCell.textContent = data.points;
+      row.appendChild(pointsCell);
+      
+      tbody.appendChild(row);
+    });
+  }
+</script>
