@@ -129,7 +129,7 @@
 
           // Calculate the point system for this trend card list
           const pointSystem = [89, 55, 34, 21, 13, 8, 5, 3, 2, 1].map(
-            point => Math.ceil(point - (i * (point / trendCards.length)))
+            point => Math.ceil(point - (1.5 * i * (point / trendCards.length)))
           );
 
           const listItems = trendCard.querySelectorAll('li');
