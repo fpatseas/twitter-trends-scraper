@@ -156,6 +156,10 @@
       .slice(0, maxTrends);
 
     // Prepare the report
+    const meta = document.createElement('meta');
+    meta.setAttribute('charset', 'utf-8');
+    document.head.appendChild(meta); 
+    
     const header = document.createElement('h1');
     const link = document.createElement('a');
     link.href = targetUrl;
