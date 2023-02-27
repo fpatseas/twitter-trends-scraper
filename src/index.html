@@ -6,6 +6,23 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="ie=edge" />
   <title>Web Trends Greece</title>
+  <style>
+    .image-cell img {
+      display: block;
+      width: 100%;
+      max-width: 200px;
+      height: auto;
+      margin-bottom: 10px;
+    }
+
+    /* Adjust spacing for screens larger than 600px */
+    @media (min-width: 600px) {
+      .image-cell img {
+        margin-right: 10px;
+        float: left;
+      }
+    }
+  </style>
   <script>
     // Set the URL to be scraped
     const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
@@ -115,7 +132,7 @@
         row.appendChild(descriptionCell);
 
         const searchesCell = document.createElement('td');
-        searchesCell.textContent = data.searches;
+        searchesCell.textContent = data.searches.replace(',000', 'K');
         searchesCell.setAttribute('width', '80px');
         row.appendChild(searchesCell);
 
@@ -314,6 +331,7 @@
         let trendCell = document.createElement('td');
         trendCell.setAttribute('align', 'center');
         trendCell.setAttribute('width', '60px');
+        trendCell.setAttribute('nowrap', 'nowrap');
         let trendText = '';
         let trendColor = '#000000';
         let currentRank = ` (${firstRank + 1})`;
@@ -451,26 +469,19 @@
         row.appendChild(rankCell);
 
         const imageCell = document.createElement('td');
-        imageCell.setAttribute('align', 'center');
         const image = document.createElement('img');
         image.setAttribute('src', data.imageUrl);
-        image.setAttribute('style', 'width: 100%; max-width:200px; min-width:100px; height:auto;');
         imageCell.appendChild(image);
-        row.appendChild(imageCell);
-
-        const titleCell = document.createElement('td');
         const tagLink = document.createElement('a');
         tagLink.href = link;
         tagLink.target = '_blank';
         tagLink.textContent = tag;
-        titleCell.appendChild(tagLink);
-        row.appendChild(titleCell);
-
-        const pubDateCell = document.createElement('td');
-        pubDateCell.setAttribute('nowrap', 'nowrap');
-        pubDateCell.setAttribute('width', '80px');
-        pubDateCell.textContent = data.pubDate.toLocaleDateString('el-GR', { day: 'numeric', month: 'short', year: 'numeric' });
-        row.appendChild(pubDateCell);
+        imageCell.appendChild(tagLink);
+        const pubDate = document.createElement('p');
+        pubDate.textContent = data.pubDate.toLocaleDateString('el-GR', { day: 'numeric', month: 'short' });
+        imageCell.appendChild(pubDate);
+        imageCell.classList.add('image-cell');
+        row.appendChild(imageCell);
 
         tbody.appendChild(row);
       });
