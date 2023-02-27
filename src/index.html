@@ -11,7 +11,8 @@
     const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
     const twitterTrendsUrl = 'https://trends24.in/greece/';
     const twitterTrendUrl = 'https://twitter.com/search?q=';
-    const googleTrendsUrl = 'https://trends.google.com/trends/trendingsearches/daily/rss?geo=GR';
+    const googleTrendsUrl = 'https://trends.google.com/trends/trendingsearches/daily?geo=GR&hl=en-US';
+    const googleTrendsRSSUrl = 'https://trends.google.com/trends/trendingsearches/daily/rss?geo=GR';
     const googleTrendUrl = 'https://trends.google.com/trends/explore?date=now%207-d&geo=GR&q=';
 
     const SIMILARITY_THRESHOLD = 0.5;
@@ -19,7 +20,7 @@
     const REDUCED_POINTS_FACTOR = 1.9;
 
     // Fetch the HTML content of the website using a proxy to bypass the CORS restrictions
-    fetch(proxyUrl + googleTrendsUrl + '&cb=' + Math.random())
+    fetch(proxyUrl + googleTrendsRSSUrl + '&cb=' + Math.random())
       .then(response => {
         if (!response.ok) {
           const link = document.createElement('a');
