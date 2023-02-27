@@ -19,7 +19,7 @@
 
     const SIMILARITY_THRESHOLD = 0.5;
     const MAX_TRENDS = 10;
-    const REDUCED_POINTS_FACTOR = 1.9;
+    const REDUCED_POINTS_FACTOR = 2.1;
 
     // Fetch the HTML content of the website using a proxy to bypass the CORS restrictions
     fetch(proxyUrl + googleTrendsRSSUrl + '&cb=' + Math.random())
@@ -99,6 +99,7 @@
 
         const rankCell = document.createElement('td');
         rankCell.textContent = i + 1;
+        rankCell.setAttribute('width', '30px');
         row.appendChild(rankCell);
 
         const titleCell = document.createElement('td');
@@ -115,6 +116,7 @@
 
         const searchesCell = document.createElement('td');
         searchesCell.textContent = data.searches;
+        searchesCell.setAttribute('width', '80px');
         row.appendChild(searchesCell);
 
         tbody.appendChild(row);
@@ -239,9 +241,10 @@
         const trendCard = trendCards[i];
 
         // Calculate the point system for this trend card list
-        const pointSystem = [89, 55, 34, 21, 13, 8, 5, 3, 2, 1].map(
-          point => Math.ceil(point - (REDUCED_POINTS_FACTOR * i * (point / trendCards.length)))
-        );
+        const pointSystem = [89, 55, 34, 21, 13, 8, 5, 3, 2, 1].map((point, index) => {
+          const multiplier = i === 0 ? 5 : i === 1 ? 3 : 1;
+          return Math.ceil(point * multiplier - (REDUCED_POINTS_FACTOR * i * (point / trendCards.length)));
+        });
 
         const listItems = trendCard.querySelectorAll('li');
 
@@ -305,9 +308,12 @@
 
         const rankCell = document.createElement('td');
         rankCell.textContent = i + 1;
+        rankCell.setAttribute('width', '30px');
         row.appendChild(rankCell);
 
         let trendCell = document.createElement('td');
+        trendCell.setAttribute('align', 'center');
+        trendCell.setAttribute('width', '60px');
         let trendText = '';
         let trendColor = '#000000';
         let currentRank = ` (${firstRank + 1})`;
@@ -355,6 +361,7 @@
 
         const pointsCell = document.createElement('td');
         pointsCell.textContent = data.points;
+        pointsCell.setAttribute('width', '80px');
         row.appendChild(pointsCell);
 
         tbody.appendChild(row);
@@ -440,6 +447,7 @@
 
         const rankCell = document.createElement('td');
         rankCell.textContent = i + 1;
+        rankCell.setAttribute('width', '30px');
         row.appendChild(rankCell);
 
         const imageCell = document.createElement('td');
@@ -460,6 +468,7 @@
 
         const pubDateCell = document.createElement('td');
         pubDateCell.setAttribute('nowrap', 'nowrap');
+        pubDateCell.setAttribute('width', '80px');
         pubDateCell.textContent = data.pubDate.toLocaleDateString('el-GR', { day: 'numeric', month: 'short', year: 'numeric' });
         row.appendChild(pubDateCell);
 
