@@ -14,6 +14,8 @@
     const googleTrendsUrl = 'https://trends.google.com/trends/trendingsearches/daily?geo=GR&hl=en-US';
     const googleTrendsRSSUrl = 'https://trends.google.com/trends/trendingsearches/daily/rss?geo=GR';
     const googleTrendUrl = 'https://trends.google.com/trends/explore?date=now%207-d&geo=GR&q=';
+    const youtubeTrendsUrl = 'https://www.youtube.com/feed/trending';
+    const youtubeTrendsRSSUrl = 'https://rss.app/feeds/Fbry9FdcaynO0XFl.xml';
 
     const SIMILARITY_THRESHOLD = 0.5;
     const MAX_TRENDS = 10;
@@ -43,7 +45,7 @@
         const xml = parser.parseFromString(xmlString, 'application/xml');
         processGoogleTrends(xml);
       })
-      .catch(() => {
+      .catch((error) => {
         const span = document.createElement('span');
         span.textContent = 'Error: ' + error.message;
         document.body.appendChild(span);
@@ -69,6 +71,8 @@
         };
       }
 
+      const container = document.getElementById('googleTrends');
+
       // Prepare the report
       const header = document.createElement('h1');
       const link = document.createElement('a');
@@ -76,14 +80,14 @@
       link.target = '_blank';
       link.textContent = 'Google Trends Greece';
       header.appendChild(link);
-      document.body.appendChild(header);
+      container.appendChild(header);
 
       const table = document.createElement('table');
       table.setAttribute('border', '1');
       table.setAttribute('cellpadding', '10');
       table.setAttribute('cellspacing', '0');
       table.setAttribute('width', '100%');
-      document.body.appendChild(table);
+      container.appendChild(table);
 
       const tbody = document.createElement('tbody');
       table.appendChild(tbody);
@@ -141,7 +145,7 @@
         const doc = parser.parseFromString(html, 'text/html');
         processTwitterTrends(doc);
       })
-      .catch(() => {
+      .catch((error) => {
         const span = document.createElement('span');
         span.textContent = 'Error: ' + error.message;
         document.body.appendChild(span);
@@ -269,6 +273,8 @@
         .sort(([, dataA], [, dataB]) => dataB.points - dataA.points)
         .slice(0, MAX_TRENDS);
 
+      const container = document.getElementById('twitterTrends');
+
       // Prepare the report
       const header = document.createElement('h1');
       const link = document.createElement('a');
@@ -276,14 +282,14 @@
       link.target = '_blank';
       link.textContent = 'Twitter Trends Greece';
       header.appendChild(link);
-      document.body.appendChild(header);
+      container.appendChild(header);
 
       const table = document.createElement('table');
       table.setAttribute('border', '1');
       table.setAttribute('cellpadding', '10');
       table.setAttribute('cellspacing', '0');
       table.setAttribute('width', '100%');
-      document.body.appendChild(table);
+      container.appendChild(table);
 
       const tbody = document.createElement('tbody');
       table.appendChild(tbody);
@@ -354,10 +360,119 @@
         tbody.appendChild(row);
       });
     }
+
+    // Fetch the HTML content of the website using a proxy to bypass the CORS restrictions
+    fetch(proxyUrl + youtubeTrendsRSSUrl + '?cb=' + Math.random())
+      .then(response => {
+        if (!response.ok) {
+          const link = document.createElement('a');
+          link.href = proxyUrl;
+          link.target = '_blank';
+          link.textContent = 'You must get temporary CORS access first';
+          document.body.appendChild(link);
+
+          return;
+        }
+        return response.text();
+      })
+      .then(xmlString => {
+        if (!xmlString) {
+          // Stop processing if the response wasn't successful
+          return;
+        }
+
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(xmlString, 'application/xml');
+        processYoutubeTrends(xml);
+      })
+      .catch((error) => {
+        const span = document.createElement('span');
+        span.textContent = 'Error: ' + error.message;
+        document.body.appendChild(span);
+      });
+
+    async function processYoutubeTrends(xml) {
+      // Create an object to hold trends data
+      const globalTrends = {};
+
+      // Get all trend card lists
+      const trendCards = xml.querySelectorAll(`item:nth-of-type(-n+${MAX_TRENDS})`);
+
+      for (let i = 0; i < trendCards.length; i++) {
+        const trendCard = trendCards[i];
+        const title = trendCard.querySelector('title').textContent.trim();
+        const link = trendCard.querySelector('link').textContent;
+        const imageUrl = trendCard.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'content')[0].getAttribute('url');
+        const pubDate = new Date(trendCard.querySelector('pubDate').textContent);
+
+        globalTrends[title] = {
+          link: link,
+          imageUrl: imageUrl,
+          pubDate: pubDate
+        };
+      }
+
+      const container = document.getElementById('youtubeTrends');
+
+      // Prepare the report
+      const header = document.createElement('h1');
+      const link = document.createElement('a');
+      link.href = youtubeTrendsUrl;
+      link.target = '_blank';
+      link.textContent = 'Youtube Trends Greece';
+      header.appendChild(link);
+      container.appendChild(header);
+
+      const table = document.createElement('table');
+      table.setAttribute('border', '1');
+      table.setAttribute('cellpadding', '10');
+      table.setAttribute('cellspacing', '0');
+      table.setAttribute('width', '100%');
+      container.appendChild(table);
+
+      const tbody = document.createElement('tbody');
+      table.appendChild(tbody);
+
+      // Loop through each sorted tag and add a row to the table
+      Object.entries(globalTrends).forEach(([tag, data], i) => {
+
+        const row = document.createElement('tr');
+
+        const rankCell = document.createElement('td');
+        rankCell.textContent = i + 1;
+        row.appendChild(rankCell);
+
+        const imageCell = document.createElement('td');
+        imageCell.setAttribute('align', 'center');
+        const image = document.createElement('img');
+        image.setAttribute('src', data.imageUrl);
+        image.setAttribute('style', 'width: 100%; max-width:200px; min-width:100px; height:auto;');
+        imageCell.appendChild(image);
+        row.appendChild(imageCell);
+
+        const titleCell = document.createElement('td');
+        const tagLink = document.createElement('a');
+        tagLink.href = link;
+        tagLink.target = '_blank';
+        tagLink.textContent = tag;
+        titleCell.appendChild(tagLink);
+        row.appendChild(titleCell);
+
+        const pubDateCell = document.createElement('td');
+        pubDateCell.setAttribute('nowrap', 'nowrap');
+        pubDateCell.textContent = data.pubDate.toLocaleDateString('el-GR', { day: 'numeric', month: 'short', year: 'numeric' });
+        row.appendChild(pubDateCell);
+
+        tbody.appendChild(row);
+      });
+    }
   </script>
 </head>
 
 <body>
+  <div id="twitterTrends"></div>
+  <div id="googleTrends"></div>
+  <div id="youtubeTrends"></div>
 </body>
 
 </html>
