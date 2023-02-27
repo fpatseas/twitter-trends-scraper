@@ -5,18 +5,113 @@
   <meta charset="UTF-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1.0" />
   <meta http-equiv="X-UA-Compatible" content="ie=edge" />
-  <title>Twitter Trends Greece</title>
+  <title>Web Trends Greece</title>
   <script>
     // Set the URL to be scraped
     const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-    const targetUrl = 'https://trends24.in/greece/';
+    const twitterTrendsUrl = 'https://trends24.in/greece/';
+    const twitterTrendUrl = 'https://twitter.com/search?q=';
+    const googleTrendsUrl = 'https://trends.google.com/trends/trendingsearches/daily/rss?geo=GR';
+    const googleTrendUrl = 'https://trends.google.com/trends/explore?date=now%207-d&geo=GR&q=';
 
     const SIMILARITY_THRESHOLD = 0.5;
-    const MAX_TWITTER_TRENDS = 10;
+    const MAX_TRENDS = 10;
     const REDUCED_POINTS_FACTOR = 1.9;
 
     // Fetch the HTML content of the website using a proxy to bypass the CORS restrictions
-    fetch(proxyUrl + targetUrl + '?cb=' + Math.random())
+    fetch(proxyUrl + googleTrendsUrl + '&cb=' + Math.random())
+      .then(response => {
+        if (!response.ok) {
+          const link = document.createElement('a');
+          link.href = proxyUrl;
+          link.target = '_blank';
+          link.textContent = 'You must get temporary CORS access first';
+          document.body.appendChild(link);
+
+          return;
+        }
+        return response.text();
+      })
+      .then(xmlString => {
+        if (!xmlString) {
+          // Stop processing if the response wasn't successful
+          return;
+        }
+
+        const parser = new DOMParser();
+        const xml = parser.parseFromString(xmlString, 'application/xml');
+        processGoogleTrends(xml);
+      })
+      .catch(() => {
+        const span = document.createElement('span');
+        span.textContent = 'Error: ' + error.message;
+        document.body.appendChild(span);
+      });
+
+    async function processGoogleTrends(xml) {
+
+      // Create an object to hold trends data
+      const globalTrends = {};
+
+      // Get all trend card lists
+      const trendCards = xml.querySelectorAll(`item:nth-of-type(-n+${MAX_TRENDS})`);
+
+      for (let i = 0; i < trendCards.length; i++) {
+        const trendCard = trendCards[i];
+        const title = trendCard.querySelector('title').textContent.trim();
+        const searches = trendCard.getElementsByTagNameNS('https://trends.google.com/trends/trendingsearches/daily', 'approx_traffic')[0].textContent.trim();
+
+        globalTrends[title] = {
+          searches: searches
+        };
+      }
+
+      // Prepare the report
+      const header = document.createElement('h1');
+      const link = document.createElement('a');
+      link.href = googleTrendsUrl;
+      link.target = '_blank';
+      link.textContent = 'Google Trends Greece';
+      header.appendChild(link);
+      document.body.appendChild(header);
+
+      const table = document.createElement('table');
+      table.setAttribute('border', '1');
+      table.setAttribute('cellpadding', '10');
+      table.setAttribute('cellspacing', '0');
+      table.setAttribute('width', '100%');
+      document.body.appendChild(table);
+
+      const tbody = document.createElement('tbody');
+      table.appendChild(tbody);
+
+      // Loop through each sorted tag and add a row to the table
+      Object.entries(globalTrends).forEach(([tag, data], i) => {
+
+        const row = document.createElement('tr');
+
+        const rankCell = document.createElement('td');
+        rankCell.textContent = i + 1;
+        row.appendChild(rankCell);
+
+        const titleCell = document.createElement('td');
+        const tagLink = document.createElement('a');
+        tagLink.href = googleTrendUrl + encodeURIComponent(tag);
+        tagLink.target = '_blank';
+        tagLink.textContent = tag;
+        titleCell.appendChild(tagLink);
+        row.appendChild(titleCell);
+
+        const searchesCell = document.createElement('td');
+        searchesCell.textContent = data.searches;
+        row.appendChild(searchesCell);
+
+        tbody.appendChild(row);
+      });
+    }
+
+    // Fetch the HTML content of the website using a proxy to bypass the CORS restrictions
+    fetch(proxyUrl + twitterTrendsUrl + '?cb=' + Math.random())
       .then(response => {
         if (!response.ok) {
           const link = document.createElement('a');
@@ -37,7 +132,7 @@
 
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
-        processTrendCards(doc);
+        processTwitterTrends(doc);
       })
       .catch(() => {
         const span = document.createElement('span');
@@ -121,7 +216,7 @@
       return data;
     }
 
-    async function processTrendCards(doc) {
+    async function processTwitterTrends(doc) {
 
       // Create an object to hold trends data
       const globalTrends = {};
@@ -165,12 +260,12 @@
       // Sort the mergedTrends object by points and take the top MAX_TWITTER_TRENDS tags
       const sortedTrends = Object.entries(mergedTrends)
         .sort(([, dataA], [, dataB]) => dataB.points - dataA.points)
-        .slice(0, MAX_TWITTER_TRENDS);
+        .slice(0, MAX_TRENDS);
 
       // Prepare the report
       const header = document.createElement('h1');
       const link = document.createElement('a');
-      link.href = targetUrl;
+      link.href = twitterTrendsUrl;
       link.target = '_blank';
       link.textContent = 'Twitter Trends Greece';
       header.appendChild(link);
@@ -194,7 +289,6 @@
         const firstRank = data.ranks[0];
 
         const row = document.createElement('tr');
-        tbody.appendChild(row);
 
         const rankCell = document.createElement('td');
         rankCell.textContent = i + 1;
@@ -240,7 +334,7 @@
 
         const titleCell = document.createElement('td');
         const tagLink = document.createElement('a');
-        tagLink.href = 'https://twitter.com/search?q=' + encodeURIComponent(tag);
+        tagLink.href = twitterTrendUrl + encodeURIComponent(tag);
         tagLink.target = '_blank';
         tagLink.textContent = tag;
         titleCell.appendChild(tagLink);
