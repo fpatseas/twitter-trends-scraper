@@ -61,9 +61,11 @@
         const trendCard = trendCards[i];
         const title = trendCard.querySelector('title').textContent.trim();
         const searches = trendCard.getElementsByTagNameNS('https://trends.google.com/trends/trendingsearches/daily', 'approx_traffic')[0].textContent.trim();
+        const description = trendCard.querySelector('description').textContent.trim();
 
         globalTrends[title] = {
-          searches: searches
+          searches: searches,
+          description: description
         };
       }
 
@@ -102,6 +104,10 @@
         tagLink.textContent = tag;
         titleCell.appendChild(tagLink);
         row.appendChild(titleCell);
+
+        const descriptionCell = document.createElement('td');
+        descriptionCell.textContent = data.description;
+        row.appendChild(descriptionCell);
 
         const searchesCell = document.createElement('td');
         searchesCell.textContent = data.searches;
