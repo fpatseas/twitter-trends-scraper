@@ -11,6 +11,10 @@
     const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
     const targetUrl = 'https://trends24.in/greece/';
 
+    const SIMILARITY_THRESHOLD = 0.5;
+    const MAX_TWITTER_TRENDS = 10;
+    const REDUCED_POINTS_FACTOR = 1.9;
+
     // Fetch the HTML content of the website using a proxy to bypass the CORS restrictions
     fetch(proxyUrl + targetUrl + '?cb=' + Math.random())
       .then(response => {
@@ -21,11 +25,16 @@
           link.textContent = 'You must get temporary CORS access first';
           document.body.appendChild(link);
 
-          return false;
+          return;
         }
         return response.text();
       })
       .then(html => {
+        if (!html) {
+          // Stop processing if the response wasn't successful
+          return;
+        }
+
         const parser = new DOMParser();
         const doc = parser.parseFromString(html, 'text/html');
         processTrendCards(doc);
@@ -53,8 +62,6 @@
     async function mergeSimilarKeys(data) {
       // Load string-similarity library
       await loadScript('https://unpkg.com/string-similarity@4.0.4/umd/string-similarity.min.js');
-
-      const SIMILARITY_THRESHOLD = 0.5;
 
       // Find all pairs of keys with similarity score over 0.6
       const pairs = [];
@@ -119,9 +126,6 @@
       // Create an object to hold trends data
       const globalTrends = {};
 
-      // Maximum number of trends to show
-      const maxTrends = 10;
-
       // Get all trend card lists
       const trendCards = doc.querySelectorAll('.trend-card__list');
 
@@ -130,7 +134,7 @@
 
         // Calculate the point system for this trend card list
         const pointSystem = [89, 55, 34, 21, 13, 8, 5, 3, 2, 1].map(
-          point => Math.ceil(point - (1.5 * i * (point / trendCards.length)))
+          point => Math.ceil(point - (REDUCED_POINTS_FACTOR * i * (point / trendCards.length)))
         );
 
         const listItems = trendCard.querySelectorAll('li');
@@ -158,10 +162,10 @@
 
       const mergedTrends = await mergeSimilarKeys(globalTrends);
 
-      // Sort the mergedTrends object by points and take the top maxTrends tags
+      // Sort the mergedTrends object by points and take the top MAX_TWITTER_TRENDS tags
       const sortedTrends = Object.entries(mergedTrends)
         .sort(([, dataA], [, dataB]) => dataB.points - dataA.points)
-        .slice(0, maxTrends);
+        .slice(0, MAX_TWITTER_TRENDS);
 
       // Prepare the report
       const header = document.createElement('h1');
