@@ -473,7 +473,7 @@
         image.setAttribute('src', data.imageUrl);
         imageCell.appendChild(image);
         const tagLink = document.createElement('a');
-        tagLink.href = link;
+        tagLink.href = data.link;
         tagLink.target = '_blank';
         tagLink.textContent = tag;
         imageCell.appendChild(tagLink);
