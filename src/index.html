@@ -12,7 +12,7 @@
     const targetUrl = 'https://trends24.in/greece/';
 
     // Fetch the HTML content of the website using a proxy to bypass the CORS restrictions
-    fetch(proxyUrl + targetUrl)
+    fetch(proxyUrl + targetUrl + '?cb=' + Math.random())
       .then(response => {
         if (!response.ok) {
           const link = document.createElement('a');
@@ -150,7 +150,7 @@
           }
 
           // If the current trend card list is one of the first two (last 2 hours), add the current title's rank to its ranks array
-          if (i < 2) {
+          if (i < 2 && globalTrends[tag].ranks[i] == null) {
             globalTrends[tag].ranks[i] = currentTrendRank;
           }
         }
