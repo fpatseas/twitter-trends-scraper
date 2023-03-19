@@ -24,49 +24,80 @@
     }
   </style>
   <script>
-    // Set the URL to be scraped
-    const proxyUrl = 'https://cors-anywhere.herokuapp.com/';
-    const twitterTrendsUrl = 'https://trends24.in/greece/';
-    const twitterTrendUrl = 'https://twitter.com/search?q=';
-    const googleTrendsUrl = 'https://trends.google.com/trends/trendingsearches/daily?geo=GR&hl=en-US';
-    const googleTrendsRSSUrl = 'https://trends.google.com/trends/trendingsearches/daily/rss?geo=GR';
-    const googleTrendUrl = 'https://trends.google.com/trends/explore?date=now%207-d&geo=GR&q=';
-    const youtubeTrendsUrl = 'https://www.youtube.com/feed/trending?gl=GR';
-    const youtubeTrendsRSSUrl = 'https://rss.app/feeds/Fbry9FdcaynO0XFl.xml';
+    const urls = {
+      proxy: 'https://cors-anywhere.herokuapp.com/',
+      twitterTrends: 'https://trends24.in/greece/',
+      twitterTrend: 'https://twitter.com/search?q=',
+      googleTrends: {
+        main: 'https://trends.google.com/trends/trendingsearches/daily?geo=GR&hl=en-US',
+        rss: 'https://trends.google.com/trends/trendingsearches/daily/rss?geo=GR',
+        explore: 'https://trends.google.com/trends/explore?date=now%207-d&geo=GR&q=',
+      },
+    };
 
-    const SIMILARITY_THRESHOLD = 0.5;
-    const MAX_TRENDS = 10;
-    const REDUCED_POINTS_FACTOR = 2.1;
+    const constants = {
+      similarityThreshold: 0.5,
+      maxTrends: 10,
+      reducedPointsFactor: 2.1,
+    };
 
-    // Fetch the HTML content of the website using a proxy to bypass the CORS restrictions
-    fetch(proxyUrl + googleTrendsRSSUrl + '&cb=' + Math.random())
-      .then(response => {
+    async function fetchContent(url) {
+      try {
+        const response = await fetch(urls.proxy + url + (url.indexOf('?') > -1 ? '&' : '?') + 'cb=' + Math.random());
         if (!response.ok) {
-          const link = document.createElement('a');
-          link.href = proxyUrl;
-          link.target = '_blank';
-          link.textContent = 'You must get temporary CORS access first';
+          const link = createLink(urls.proxy, 'You must get temporary CORS access first');
           document.body.appendChild(link);
-
           return;
         }
         return response.text();
-      })
-      .then(xmlString => {
-        if (!xmlString) {
-          // Stop processing if the response wasn't successful
-          return;
-        }
-
-        const parser = new DOMParser();
-        const xml = parser.parseFromString(xmlString, 'application/xml');
-        processGoogleTrends(xml);
-      })
-      .catch((error) => {
+      } catch (error) {
         const span = document.createElement('span');
         span.textContent = 'Error: ' + error.message;
         document.body.appendChild(span);
+      }
+    }
+
+    function loadScript(url) {
+      return new Promise((resolve, reject) => {
+        if (!document.querySelector(`script[src="${url}"]`)) {
+          const script = document.createElement('script');
+          script.type = 'text/javascript';
+          script.src = url;
+          script.onload = resolve;
+          script.onerror = reject;
+          document.head.appendChild(script);
+        }
       });
+    }
+
+    function createLink(href, text) {
+      const link = document.createElement('a');
+      link.href = href;
+      link.target = '_blank';
+      link.textContent = text;
+      return link;
+    }
+
+    function createHeader(title, url) {
+      const header = document.createElement('h1');
+      const link = createLink(url, title);
+      header.appendChild(link);
+      return header;
+    }
+
+    (async function () {
+      const googleTrendsXMLString = await fetchContent(urls.googleTrends.rss);
+      if (googleTrendsXMLString) {
+        const googleTrendsXML = new DOMParser().parseFromString(googleTrendsXMLString, 'application/xml');
+        processGoogleTrends(googleTrendsXML);
+      }
+
+      const twitterTrendsHTMLString = await fetchContent(urls.twitterTrends);
+      if (twitterTrendsHTMLString) {
+        const twitterTrendsDoc = new DOMParser().parseFromString(twitterTrendsHTMLString, 'text/html');
+        processTwitterTrends(twitterTrendsDoc);
+      }
+    })();
 
     async function processGoogleTrends(xml) {
 
@@ -74,13 +105,13 @@
       const globalTrends = {};
 
       // Get all trend card lists
-      const trendCards = xml.querySelectorAll(`item:nth-of-type(-n+${MAX_TRENDS})`);
+      const trendCards = xml.querySelectorAll(`item:nth-of-type(-n+${constants.maxTrends})`);
 
       for (let i = 0; i < trendCards.length; i++) {
         const trendCard = trendCards[i];
         const title = trendCard.querySelector('title').textContent.trim();
         const searches = trendCard.getElementsByTagNameNS('https://trends.google.com/trends/trendingsearches/daily', 'approx_traffic')[0].textContent.trim();
-        const description = trendCard.querySelector('description').textContent.trim();
+        const description = trendCard.getElementsByTagNameNS('https://trends.google.com/trends/trendingsearches/daily', 'news_item_title')[0].textContent.trim();
 
         globalTrends[title] = {
           searches: searches,
@@ -93,7 +124,7 @@
       // Prepare the report
       const header = document.createElement('h1');
       const link = document.createElement('a');
-      link.href = googleTrendsUrl;
+      link.href = urls.googleTrends.main;
       link.target = '_blank';
       link.textContent = 'Google Trends Greece';
       header.appendChild(link);
@@ -117,70 +148,33 @@
         const rankCell = document.createElement('td');
         rankCell.textContent = i + 1;
         rankCell.setAttribute('width', '30px');
+        rankCell.setAttribute('rowspan', '2');
         row.appendChild(rankCell);
 
         const titleCell = document.createElement('td');
         const tagLink = document.createElement('a');
-        tagLink.href = googleTrendUrl + encodeURIComponent(tag);
+        tagLink.href = urls.googleTrends.explore + encodeURIComponent(tag);
         tagLink.target = '_blank';
         tagLink.textContent = tag;
         titleCell.appendChild(tagLink);
         row.appendChild(titleCell);
 
-        const descriptionCell = document.createElement('td');
-        descriptionCell.textContent = data.description;
-        row.appendChild(descriptionCell);
-
         const searchesCell = document.createElement('td');
-        searchesCell.textContent = data.searches.replace(',000', 'K');
+        searchesCell.textContent = data.searches.replace(',000,000', 'M').replace(',000', 'K');
         searchesCell.setAttribute('width', '80px');
+        searchesCell.setAttribute('rowspan', '2');
         row.appendChild(searchesCell);
 
         tbody.appendChild(row);
-      });
-    }
 
-    // Fetch the HTML content of the website using a proxy to bypass the CORS restrictions
-    fetch(proxyUrl + twitterTrendsUrl + '?cb=' + Math.random())
-      .then(response => {
-        if (!response.ok) {
-          const link = document.createElement('a');
-          link.href = proxyUrl;
-          link.target = '_blank';
-          link.textContent = 'You must get temporary CORS access first';
-          document.body.appendChild(link);
 
-          return;
-        }
-        return response.text();
-      })
-      .then(html => {
-        if (!html) {
-          // Stop processing if the response wasn't successful
-          return;
-        }
+        const row2 = document.createElement('tr');
 
-        const parser = new DOMParser();
-        const doc = parser.parseFromString(html, 'text/html');
-        processTwitterTrends(doc);
-      })
-      .catch((error) => {
-        const span = document.createElement('span');
-        span.textContent = 'Error: ' + error.message;
-        document.body.appendChild(span);
-      });
+        const descriptionCell = document.createElement('td');
+        descriptionCell.textContent = data.description;
+        row2.appendChild(descriptionCell);
 
-    // Load string-similarity library dynamically
-    function loadScript(url) {
-      return new Promise((resolve, reject) => {
-        if (!document.querySelector(`script[src="${url}"]`)) {
-          const script = document.createElement('script');
-          script.type = 'text/javascript';
-          script.src = url;
-          script.onload = resolve;
-          script.onerror = reject;
-          document.head.appendChild(script);
-        }
+        tbody.appendChild(row2);
       });
     }
 
@@ -194,7 +188,7 @@
       for (let i = 0; i < keys.length; i++) {
         for (let j = i + 1; j < keys.length; j++) {
           const similarity = stringSimilarity.compareTwoStrings(keys[i].toLowerCase(), keys[j].toLowerCase());
-          if (similarity > SIMILARITY_THRESHOLD) {
+          if (similarity > constants.similarityThreshold) {
             let found = false;
             for (let k = 0; k < pairs.length; k++) {
               if (pairs[k].includes(keys[i]) || pairs[k].includes(keys[j])) {
@@ -260,7 +254,7 @@
         // Calculate the point system for this trend card list
         const pointSystem = [89, 55, 34, 21, 13, 8, 5, 3, 2, 1].map((point, index) => {
           const multiplier = i === 0 ? 5 : i === 1 ? 3 : 1;
-          return Math.ceil(point * multiplier - (REDUCED_POINTS_FACTOR * i * (point / trendCards.length)));
+          return Math.ceil(point * multiplier - (constants.reducedPointsFactor * i * (point / trendCards.length)));
         });
 
         const listItems = trendCard.querySelectorAll('li');
@@ -291,14 +285,14 @@
       // Sort the mergedTrends object by points and take the top MAX_TWITTER_TRENDS tags
       const sortedTrends = Object.entries(mergedTrends)
         .sort(([, dataA], [, dataB]) => dataB.points - dataA.points)
-        .slice(0, MAX_TRENDS);
+        .slice(0, constants.maxTrends);
 
       const container = document.getElementById('twitterTrends');
 
       // Prepare the report
       const header = document.createElement('h1');
       const link = document.createElement('a');
-      link.href = twitterTrendsUrl;
+      link.href = urls.twitterTrends;
       link.target = '_blank';
       link.textContent = 'Twitter Trends Greece';
       header.appendChild(link);
@@ -371,7 +365,7 @@
 
         const titleCell = document.createElement('td');
         const tagLink = document.createElement('a');
-        tagLink.href = twitterTrendUrl + encodeURIComponent(tag);
+        tagLink.href = urls.twitterTrend + encodeURIComponent(tag);
         tagLink.target = '_blank';
         tagLink.textContent = tag;
         titleCell.appendChild(tagLink);
@@ -385,114 +379,12 @@
         tbody.appendChild(row);
       });
     }
-
-    // Fetch the HTML content of the website using a proxy to bypass the CORS restrictions
-    fetch(proxyUrl + youtubeTrendsRSSUrl + '?cb=' + Math.random())
-      .then(response => {
-        if (!response.ok) {
-          const link = document.createElement('a');
-          link.href = proxyUrl;
-          link.target = '_blank';
-          link.textContent = 'You must get temporary CORS access first';
-          document.body.appendChild(link);
-
-          return;
-        }
-        return response.text();
-      })
-      .then(xmlString => {
-        if (!xmlString) {
-          // Stop processing if the response wasn't successful
-          return;
-        }
-
-        const parser = new DOMParser();
-        const xml = parser.parseFromString(xmlString, 'application/xml');
-        processYoutubeTrends(xml);
-      })
-      .catch((error) => {
-        const span = document.createElement('span');
-        span.textContent = 'Error: ' + error.message;
-        document.body.appendChild(span);
-      });
-
-    async function processYoutubeTrends(xml) {
-      // Create an object to hold trends data
-      const globalTrends = {};
-
-      // Get all trend card lists
-      const trendCards = xml.querySelectorAll(`item:nth-of-type(-n+${MAX_TRENDS})`);
-
-      for (let i = 0; i < trendCards.length; i++) {
-        const trendCard = trendCards[i];
-        const title = trendCard.querySelector('title').textContent.trim();
-        const link = trendCard.querySelector('link').textContent;
-        const imageUrl = trendCard.getElementsByTagNameNS('http://search.yahoo.com/mrss/', 'content')[0].getAttribute('url');
-        const pubDate = new Date(trendCard.querySelector('pubDate').textContent);
-
-        globalTrends[title] = {
-          link: link,
-          imageUrl: imageUrl,
-          pubDate: pubDate
-        };
-      }
-
-      const container = document.getElementById('youtubeTrends');
-
-      // Prepare the report
-      const header = document.createElement('h1');
-      const link = document.createElement('a');
-      link.href = youtubeTrendsUrl;
-      link.target = '_blank';
-      link.textContent = 'Youtube Trends Greece';
-      header.appendChild(link);
-      container.appendChild(header);
-
-      const table = document.createElement('table');
-      table.setAttribute('border', '1');
-      table.setAttribute('cellpadding', '10');
-      table.setAttribute('cellspacing', '0');
-      table.setAttribute('width', '100%');
-      container.appendChild(table);
-
-      const tbody = document.createElement('tbody');
-      table.appendChild(tbody);
-
-      // Loop through each sorted tag and add a row to the table
-      Object.entries(globalTrends).forEach(([tag, data], i) => {
-
-        const row = document.createElement('tr');
-
-        const rankCell = document.createElement('td');
-        rankCell.textContent = i + 1;
-        rankCell.setAttribute('width', '30px');
-        row.appendChild(rankCell);
-
-        const imageCell = document.createElement('td');
-        const image = document.createElement('img');
-        image.setAttribute('src', data.imageUrl);
-        imageCell.appendChild(image);
-        const tagLink = document.createElement('a');
-        tagLink.href = data.link;
-        tagLink.target = '_blank';
-        tagLink.textContent = tag;
-        imageCell.appendChild(tagLink);
-        const pubDate = document.createElement('p');
-        pubDate.textContent = data.pubDate.toLocaleDateString('el-GR', { day: 'numeric', month: 'short' });
-        imageCell.appendChild(pubDate);
-        imageCell.classList.add('image-cell');
-        row.appendChild(imageCell);
-
-        tbody.appendChild(row);
-      });
-    }
   </script>
 </head>
 
 <body>
   <div id="twitterTrends"></div>
   <div id="googleTrends"></div>
-  <div id="youtubeTrends"></div>
 </body>
 
 </html>
