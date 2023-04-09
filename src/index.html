@@ -43,6 +43,7 @@
 
     async function fetchContent(url) {
       try {
+        // Access the URL through a proxy to avoid any CORS-related issues
         const response = await fetch(urls.proxy + url + (url.indexOf('?') > -1 ? '&' : '?') + 'cb=' + Math.random());
         if (!response.ok) {
           const link = createLink(urls.proxy, 'You must get temporary CORS access first');
@@ -70,6 +71,7 @@
       });
     }
 
+    // Add hyperlink helper
     function createLink(href, text) {
       const link = document.createElement('a');
       link.href = href;
@@ -78,6 +80,7 @@
       return link;
     }
 
+    // Add H1 element helper
     function createHeader(title, url) {
       const header = document.createElement('h1');
       const link = createLink(url, title);
@@ -85,6 +88,7 @@
       return header;
     }
 
+    // Register scrapers
     (async function () {
       const googleTrendsXMLString = await fetchContent(urls.googleTrends.rss);
       if (googleTrendsXMLString) {
@@ -99,12 +103,13 @@
       }
     })();
 
+    // Google Trends parser
     async function processGoogleTrends(xml) {
 
-      // Create an object to hold trends data
+      // Create an object to hold Google search trends data
       const globalTrends = {};
 
-      // Get all trend card lists
+      // Get the top N search trends
       const trendCards = xml.querySelectorAll(`item:nth-of-type(-n+${constants.maxTrends})`);
 
       for (let i = 0; i < trendCards.length; i++) {
@@ -121,7 +126,7 @@
 
       const container = document.getElementById('googleTrends');
 
-      // Prepare the report
+      // Render the report
       const header = document.createElement('h1');
       const link = document.createElement('a');
       link.href = urls.googleTrends.main;
@@ -140,7 +145,7 @@
       const tbody = document.createElement('tbody');
       table.appendChild(tbody);
 
-      // Loop through each sorted tag and add a row to the table
+      // Add each search tag as a new row to the table
       Object.entries(globalTrends).forEach(([tag, data], i) => {
 
         const row = document.createElement('tr');
@@ -167,7 +172,7 @@
 
         tbody.appendChild(row);
 
-
+        // Include an additional row for the description
         const row2 = document.createElement('tr');
 
         const descriptionCell = document.createElement('td');
@@ -179,10 +184,11 @@
     }
 
     async function mergeSimilarKeys(data) {
+
       // Load string-similarity library
       await loadScript('https://unpkg.com/string-similarity@4.0.4/umd/string-similarity.min.js');
 
-      // Find all pairs of keys with similarity score over 0.6
+      // Find all pairs of keys with similarity score over 0.5
       const pairs = [];
       const keys = Object.keys(data);
       for (let i = 0; i < keys.length; i++) {
@@ -208,6 +214,8 @@
       pairs.forEach(pair => {
         let highestPointsKey = pair[0];
         let highestPoints = data[highestPointsKey].points;
+
+        // Determine the tag with the highest number of points and use it as the key for merging
         for (let i = 1; i < pair.length; i++) {
           const key = pair[i];
           if (data[key].points > highestPoints) {
@@ -215,8 +223,11 @@
             highestPoints = data[key].points;
           }
         }
-        const mergedKey = highestPointsKey;
+
+        // Combine the points of similar tags
         const mergedPoints = pair.reduce((acc, key) => acc + data[key].points, 0);
+
+        // Select the lowest ranking (most popular) as the merged ranking
         const mergedRanks = [];
         for (let i = 0; i < data[highestPointsKey].ranks.length; i++) {
           let lowestRank = data[highestPointsKey].ranks[i];
@@ -229,9 +240,13 @@
           }
           mergedRanks.push(lowestRank);
         }
-        data[mergedKey] = { points: mergedPoints, ranks: mergedRanks };
+
+        // Update the tag with the highest number of points with the merged values 
+        data[highestPointsKey] = { points: mergedPoints, ranks: mergedRanks };
+
+        // Delete all other similar tags
         pair.forEach(key => {
-          if (key !== mergedKey) {
+          if (key !== highestPointsKey) {
             delete data[key];
           }
         });
@@ -240,26 +255,33 @@
       return data;
     }
 
+    // Twitter Trends parser
     async function processTwitterTrends(doc) {
 
-      // Create an object to hold trends data
+      // Create an object to hold Twitter hashtags/keywords data
       const globalTrends = {};
 
-      // Get all trend card lists
-      const trendCards = doc.querySelectorAll('.trend-card__list');
+      // Get all trend columns
+      const trendColumns = doc.querySelectorAll('.trend-card__list');
 
-      for (let i = 0; i < trendCards.length; i++) {
-        const trendCard = trendCards[i];
+      for (let columnIndex = 0; columnIndex < trendColumns.length; columnIndex++) {
+        const trendColumn = trendColumns[columnIndex];
 
-        // Calculate the point system for this trend card list
+        // Use Fibonacci series as a point system and assign a value to each column tag based on its index
         const pointSystem = [89, 55, 34, 21, 13, 8, 5, 3, 2, 1].map((point, index) => {
-          const multiplier = i === 0 ? 5 : i === 1 ? 3 : 1;
-          return Math.ceil(point * multiplier - (constants.reducedPointsFactor * i * (point / trendCards.length)));
+
+          // Use a multiplier to give higher point values to the items in the first two columns, to prioritize them over the other columns
+          const multiplier = columnIndex === 0 ? 5 : columnIndex === 1 ? 3 : 1;
+
+          // Use a points reduction system that gives less weight to older trends
+          // Algo: {item_column_ranking_points} * {column_multiplier} - {points_to_be_reduced}
+          return Math.ceil(point * multiplier - (constants.reducedPointsFactor * columnIndex * (point / trendColumns.length)));
         });
 
-        const listItems = trendCard.querySelectorAll('li');
+        const listItems = trendColumn.querySelectorAll('li');
 
-        for (let j = 0; j < Math.min(listItems.length, 10); j++) {
+        // Assign weight points to each trend in the column
+        for (let j = 0; j < Math.min(listItems.length, constants.maxTrends); j++) {
           const tag = listItems[j].querySelector('a').textContent;
           const currentTrendPoints = pointSystem[j];
           const currentTrendRank = j;
@@ -273,23 +295,24 @@
             globalTrends[tag].points += currentTrendPoints;
           }
 
-          // If the current trend card list is one of the first two (last 2 hours), add the current title's rank to its ranks array
+          // Save the item rankings of the first two columns to enable comparison of their trending progress
           if (i < 2 && globalTrends[tag].ranks[i] == null) {
             globalTrends[tag].ranks[i] = currentTrendRank;
           }
         }
       }
 
+      // Merge similar trend tags together
       const mergedTrends = await mergeSimilarKeys(globalTrends);
 
-      // Sort the mergedTrends object by points and take the top MAX_TWITTER_TRENDS tags
+      // Sort the mergedTrends object by points and take the top N tags
       const sortedTrends = Object.entries(mergedTrends)
         .sort(([, dataA], [, dataB]) => dataB.points - dataA.points)
         .slice(0, constants.maxTrends);
 
       const container = document.getElementById('twitterTrends');
 
-      // Prepare the report
+      // Render the report
       const header = document.createElement('h1');
       const link = document.createElement('a');
       link.href = urls.twitterTrends;
@@ -332,29 +355,29 @@
 
         // Determine the trend and set the appropriate trend text and color
         if (filteredArr.length === 1 && firstRank) {
-          // Trend only appears in the first trend card (last hour)
+          // Trend only appears in the first trend column (last hour)
           trendText = '🔥';
         } else if (filteredArr.length === 2) {
           const secondRank = data.ranks[1];
 
           if (firstRank === secondRank) {
-            // Trend appears in both trend cards at the same rank
+            // Trend appears in both trend columns at the same rank
             trendText = '⬤';
           } else {
             const rankDiff = Math.abs(firstRank - secondRank);
 
             if (firstRank < secondRank) {
-              // Trend has higher rank in the first trend card
+              // Trend has higher rank in the first trend column
               trendText = `▲ ${rankDiff}`;
               trendColor = "#448118";
             } else {
-              // Trend has higher rank in the second trend card
+              // Trend has higher rank in the second trend column
               trendText = `▼ ${rankDiff}`;
               trendColor = '#b91b20';
             }
           }
         } else {
-          // Trend doesn't appear in either of the trend cards
+          // Trend doesn't appear in either of the trend columns
           trendText = `━`;
           currentRank = '';
         }
