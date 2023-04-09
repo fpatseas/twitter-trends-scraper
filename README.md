@@ -3,7 +3,7 @@
 A vanilla JavaScript online scraper that summarizes the latest online trends in Greece based on a simple algorithm, hosted as an Azure Static App
 
 ### Live example:
-* `https://calm-stone-035349b03.2.azurestaticapps.net/`
+<a href="https://calm-stone-035349b03.2.azurestaticapps.net/" target="_blank">https://calm-stone-035349b03.2.azurestaticapps.net/</a>
 
 ### Third party tools
 * **CORS Anywhere Proxy:** A NodeJS proxy that adds CORS headers to the proxied request
