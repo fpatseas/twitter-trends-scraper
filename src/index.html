@@ -296,8 +296,8 @@
           }
 
           // Save the item rankings of the first two columns to enable comparison of their trending progress
-          if (i < 2 && globalTrends[tag].ranks[i] == null) {
-            globalTrends[tag].ranks[i] = currentTrendRank;
+          if (columnIndex < 2 && globalTrends[tag].ranks[columnIndex] == null) {
+            globalTrends[tag].ranks[columnIndex] = currentTrendRank;
           }
         }
       }
